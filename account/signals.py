@@ -10,17 +10,7 @@ from mailing.tasks import send_activation_mail
 
 
 
-@receiver(post_save,sender=ExcoRole)
-def add_member_to_ExcoRole_group(sender,**kwargs):
-    instance = kwargs['instance']
 
-    "celery fuction that add new members to the group"
-    task.update_exco_chat.delay(instance.id)
-
-@receiver(post_save,sender=CommiteeGroup)
-def add_member_to_Commitee_group(sender,**kwargs):
-    instance = kwargs['instance']
-    "celery fuction that add new members to the group"
 
 
 

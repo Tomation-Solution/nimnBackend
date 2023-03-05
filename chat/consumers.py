@@ -31,6 +31,7 @@ class ChatRoomConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
+        is_group = text_data_json['is_group']
         send_user_id = text_data_json['send_user_id']
         # tenant_name
         # print({'schema anme':connection.schema_name})
@@ -40,7 +41,7 @@ class ChatRoomConsumer(AsyncWebsocketConsumer):
 
 
         await self.validate_user(send_user_id)
-        await self.create_chat(send_user_id,message)
+        await self.create_chat(send_user_id,message,is_group)
 
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -63,11 +64,12 @@ class ChatRoomConsumer(AsyncWebsocketConsumer):
             status_code=status.HTTP_400_BAD_REQUEST
         )
     @sync_to_async
-    def create_chat(self,send_user_id,message):
+    def create_chat(self,send_user_id,message,is_group=False):
         "we get or create a group name"
         connection.set_schema(schema_name=self.tenant)
+        
         chat_room ,created=  models.ChatRoom.objects.get_or_create(
-            room_name=self.room_group_name
+            room_name=self.room_group_name,is_group=is_group
         )
         chat_room.save()
         "save the message to that group and u can add it wil the user id"
@@ -136,7 +138,6 @@ class CommiteeChatRoomConsumer(AsyncWebsocketConsumer):
         'this validation first check it the user exist and checks if he is a member and then check if he exists in the commitee'
         connection.set_schema(schema_name=self.tenant)
         if not get_user_model().objects.filter(id=send_user_id).exists():
-            print('does not exist')
             raise CustomError(
             message='User does not exist',
             status_code=status.HTTP_400_BAD_REQUEST
@@ -182,3 +183,57 @@ class CommiteeChatRoomConsumer(AsyncWebsocketConsumer):
         }))
 
     pass
+
+
+
+class ExcoChatRoomConsumer(CommiteeChatRoomConsumer):
+    
+    async def connect(self):
+        self.exco_id = self.scope['url_route']['kwargs']['exco_id']
+        self.room_group_name= self.exco_id
+        self.tenant = self.scope['url_route']['kwargs']['tenant_name']
+
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        await self.accept()
+    
+
+    @sync_to_async
+    def validate_user(self,send_user_id):
+        'this validation first check it the user exist and checks if he is a member and then check if he exists in the commitee'
+        connection.set_schema(schema_name=self.tenant)
+        if not get_user_model().objects.filter(id=send_user_id).exists():
+            raise CustomError(
+            message='User does not exist',
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+        if not user_related_models.ExcoRole.objects.filter(id=self.exco_id).exists():
+            raise CustomError(
+            message='ExcoGroup does not exist',
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+        excoRole = user_related_models.ExcoRole.objects.get(id=self.exco_id)
+# member
+        if not excoRole.member.filter(user=send_user_id).exists():
+            raise CustomError(
+                message='Access Denied',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    @sync_to_async
+    def create_chat(self,send_user_id,message):
+        "we get or create a group name"
+        connection.set_schema(schema_name=self.tenant)
+        chat_room ,created=  models.ChatRoom.objects.get_or_create(
+            room_name=self.room_group_name +'exco'
+        )
+        chat_room.save()
+        user = get_user_model().objects.get(id=send_user_id)
+        chat = models.Chat.objects.create(
+            chat_room=chat_room,
+            message=message,
+            user=user
+        )
+        chat.save()
