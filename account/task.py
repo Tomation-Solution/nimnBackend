@@ -74,6 +74,7 @@ def update_membership_grade_chat(membership_id:int):
 
 @shared_task
 def regiter_user_to_chat(member_id,):
+    "we dont use this third part endpoint any more"
     'this creates users on the third party chat app'
     member  = Memeber.objects.get(id=member_id)
     memberInfo = UserMemberInfo.objects.filter(

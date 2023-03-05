@@ -238,7 +238,7 @@ class ManageMemberValidation(viewsets.ViewSet):
                         member=member
                     )
 
-            regiter_user_to_chat.delay(member.id)
+            # regiter_user_to_chat.delay(member.id)
             charge_new_member_dues.delay(user.id)
             
             return Success_response(msg="Success",data=[],status_code=status.HTTP_201_CREATED)
